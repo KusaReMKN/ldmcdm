@@ -6,8 +6,8 @@
 #define LED_L2 D5
 
 /** 出力値 */
-#define ON	LOW
-#define OFF	HIGH
+#define ON	HIGH
+#define OFF	LOW
 
 /**
  * 2 bit のかたまりに対応する同強度のチップパターンを得る
