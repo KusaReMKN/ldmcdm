@@ -101,7 +101,7 @@ sendPreamble(void)
 	constexpr uint32_t PREAMBLE_STOP = 0xD5555555UL;
 
 	// プレアンブルパターンを送信バッファに詰める
-	constexpr int nPreamble = 4;
+	constexpr int nPreamble = 8;
 	for (int i = 0; i < nPreamble-1; i++) {
 		buffer[0][bufTail] = buffer[1][bufTail] = PREAMBLE;
 		bufTail++;
@@ -135,10 +135,14 @@ sendChar(uint8_t c)
 static void
 sendLevelCheck(void)
 {
-	for (size_t t = 0; t < 3; t++) {
-		sendChar(0xFF);
-	}
-	sendChar(0x00);
+	sendChar(0x21);
+	sendChar(0x94);
+	sendChar(0x63);
+	sendChar(0xAD);
+	sendChar(0xB5);
+	sendChar(0xF7);
+	sendChar(0xCE);
+	sendChar(0x08);
 }
 
 /**
