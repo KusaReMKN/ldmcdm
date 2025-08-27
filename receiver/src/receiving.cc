@@ -168,7 +168,7 @@ mainReceiving(void)
 	// 情報信号を復号する
 	chbuf[chTail++] = i22 << 3 | i12 << 2 | i21 << 1 | i11 << 0;
 	if (chTail == 2) {
-		Serial.printf("%c", chbuf[0] | chbuf[1] << 4);
+		Serial.print((char)(chbuf[0] | chbuf[1] << 4));
 		chTail=0;
 	}
 
