@@ -72,10 +72,10 @@ static void *
 getter(void *arg)
 {
 	struct context *ctx = (struct context *)arg;
+	int c;
 
-	for (;;)
-		ctx->buf[ctx->bufTail++] = getc(ctx->fp);
-	/* NOTREACHED */
+	while ((c = getc(ctx->fp)) != EOF)
+		ctx->buf[ctx->bufTail++] = c;
 
 	return NULL;
 }
