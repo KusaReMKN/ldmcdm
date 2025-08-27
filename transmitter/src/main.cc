@@ -81,8 +81,8 @@ chipsToPattern(uint16_t p)
 }
 
 /** 送信バッファ */
-#define BUFLEN	1024
-static volatile uint32_t buffer[2][1024];
+#define BUFLEN	3600
+static volatile uint32_t buffer[2][BUFLEN];
 /** バッファの先頭位置及び末尾位置 */
 static volatile size_t bufHead = 0, bufTail = 0;
 /** バッファのビット位置 */
@@ -237,7 +237,7 @@ loop(void)
 	if (!sending) {
 		// 送信チップレートを受け取る
 		unsigned long chipRate;
-		char buf[256], *endp;
+		char buf[16], *endp;
 		do {
 			// プロンプトを表示する
 			Serial.print('?');
