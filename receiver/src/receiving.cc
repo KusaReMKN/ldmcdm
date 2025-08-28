@@ -9,10 +9,37 @@
 #include "receiving.h"
 
 /**
- * 強度推定状態
- * 入ってきた時刻その瞬間は強度推定用信号を受信していない。
- * 入ってきた時刻の 1 周期後が強度推定用信号の最初のチップになる。
- * そこからデコードしなさい。
+ * データの受信状態
+ *
+ * 遷移元の状態
+ * 	強度推定状態
+ *
+ * 遷移先の状態
+ * 	待ち状態
+ *
+ * 開始時の処理
+ * 	チップ輝度バッファ及びデータバッファを巻き戻す。
+ * 	推定受信強度を初期化する。
+ * 	チップ読み込みタイマの割り込みを設定する。
+ * 	キャリア信号検出時の割り込みを設定する。
+ *
+ * 動作中の処理
+ * 	キャリア信号を検出すると、
+ * 		キャリア信号の最終検出時刻を更新する。
+ * 	チップ読み込みタイマが満了すると、
+ * 		測定されたチップ輝度を記録し、
+ * 		送信が終了しているか調べ、
+ * 			そのようであれば待ち状態へ遷移する。
+ * 		周期誤差を補正できそうなら、
+ * 			信号が思ったよりも早いなら次のタイマを遅らせ、
+ * 			信号が思ったよりも遅いなら次のタイマを早める。
+ * 	フレームを構成する全てのチップが記録されていれば、
+ * 		復号処理を行い、
+ * 		情報信号を復号し、シリアル通信に出力する。
+ *
+ * 終了時の処理
+ * 	チップ読み込みタイマを停止し、割り込みを解除する。
+ * 	キャリア信号検出時の割り込みを解除する。
  */
 
  /** タイマの周期 */
@@ -103,19 +130,22 @@ static size_t chTail = 0;
 void
 initReceiving(enum STATE precState, const struct Context *ctx)
 {
+	// バッファを巻き戻す
+	bufTail = 0;
+	chTail = 0;
+
 	// 推定受信強度を格納する
 	intensities[0] = ctx->intensities[0] << 7;
 	intensities[1] = ctx->intensities[1] << 7;
 	nIntensities[0] = nIntensities[1] = 32;
 
-	bufTail = 0;
-	chTail = 0;
-
+	// チップ読み込みタイマを設定する
 	timerPeriod = ctx->period;
 	TimerTc3.initialize(timerPeriod);
 	TimerTc3.attachInterrupt(tcHandler);
 	TimerTc3.start();
 
+	// キャリア信号検出時の割り込みを設定する
 	lastCSClock = 0;
 	attachInterrupt(CSINPUT, csHandler, RISING);
 
@@ -184,10 +214,11 @@ exitReceiving(enum STATE nextState)
 {
 	static struct Context ctx;
 
-	// 時間切れの割り込みをキャンセルする
+	// チップ読み込みタイマを停止し、割り込みを解除する
 	TimerTc3.stop();
 	TimerTc3.detachInterrupt();
 
+	// キャリア信号検出時の割り込みを解除する
 	detachInterrupt(CSINPUT);
 
 	ctx.size = sizeof(ctx);

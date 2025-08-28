@@ -16,6 +16,7 @@
  *
  * 遷移先の状態
  * 	受信状態
+ * 	待ち状態（受信終了時）
  *
  * メモ
  * 	この状態の開始時点は、強度推定のための疑似信号が開始する 1 スロット前
@@ -28,12 +29,25 @@
  * 	キャリア信号検出時の割り込みを設定する。
  *
  * 動作中の処理
+ * 	キャリア信号を検出すると、
+ * 		キャリア信号の最終検出時刻を更新する。
+ * 	チップ読み込みタイマが満了すると、
+ * 		測定されたチップ輝度を記録し、
+ * 		送信が終了しているか調べ、
+ * 			そのようであれば待ち状態へ遷移する。
+ * 		周期誤差を補正できそうなら、
+ * 			信号が思ったよりも早いなら次のタイマを遅らせ、
+ * 			信号が思ったよりも遅いなら次のタイマを早める。
+ * 	フレームを構成する全てのチップが記録されていれば、
+ * 		復号処理を行い、
+ * 		各層の推定強度を更新する。
+ * 		強度推定のパターンの終端を復号したら、
+ * 			受信状態へ遷移する。
  *
  * 終了時の処理
- *
- * 入ってきた時刻その瞬間は強度推定用信号を受信していない。
- * 入ってきた時刻の 1 周期後が強度推定用信号の最初のチップになる。
- * そこからデコードしなさい。
+ * 	チップ読み込みタイマを停止し、割り込みを解除する。
+ * 	キャリア信号検出時の割り込みを解除する。
+ * 	推定クロック周期及び推定信号強度を遷移先の状態へ引き継ぐ。
  */
 
 /** タイマの周期 */
@@ -136,6 +150,7 @@ initLeveling(enum STATE prevState, const struct Context *ctx)
 	TimerTc3.attachInterrupt(tcHandler);
 	TimerTc3.start();
 
+	// キャリア信号検出時の割り込みを設定する
 	lastCSClock = 0;
 	attachInterrupt(CSINPUT, csHandler, RISING);
 }
@@ -207,12 +222,14 @@ exitLeveling(enum STATE nextState)
 {
 	static struct Context ctx;
 
-	// 時間切れの割り込みをキャンセルする
+	// チップ読み込みタイマを停止し、割り込みを解除する
 	TimerTc3.stop();
 	TimerTc3.detachInterrupt();
 
+	// キャリア信号検出時の割り込みを解除する
 	detachInterrupt(CSINPUT);
 
+	// 推定クロック周期及び推定信号強度を書き込む
 	ctx.period = timerPeriod;
 	ctx.intensities[0] = intensities[0] / nIntensities[0] / 4;
 	ctx.intensities[1] = intensities[1] / nIntensities[1] / 4;
