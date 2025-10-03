@@ -13,7 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define BUFLEN	16
+#define BUFLEN	1024
 #define DEVICE	"/dev/modem"
 #define GIGA	1000000000
 #define SPEED	"300"
@@ -23,7 +23,7 @@
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: tdrive [-d transmitter] [-s speed]"
+	fprintf(stderr, "usage: tdrive [-b buflen] [-d transmitter] [-s speed]"
 			" [file ...]\n");
 	exit(EXIT_FAILURE);
 }
@@ -43,17 +43,23 @@ main(int argc, char *argv[])
 	struct termios tos;
 	struct timespec tv;
 	fd_set rfds;
+	size_t buflen;
 	ssize_t bytes;
 	timer_t timerid;
 	unsigned long period, pnprev, pnsec;
-	int c, dev, fd, i, nfds, psec, reqSpeed;
-	char *device, *endp, *filename, *speed;
-	char buf[BUFLEN];
+	int c, dev, fd, i, j, nfds, psec, reqSpeed;
+	char *buf, *device, *endp, *filename, *speed;
 
+	buflen = BUFLEN;
 	device = DEVICE;
 	speed = SPEED;
-	while ((c = getopt(argc, argv, "d:s:")) != -1)
+	while ((c = getopt(argc, argv, "b:d:s:")) != -1)
 		switch (c) {
+		case 'b':
+			buflen = strtoul(optarg, &endp, 0);
+			if (buflen == 0 || *endp != '\0')
+				errx(EXIT_FAILURE, "invalid buffer length");
+			break;
 		case 'd':
 			device = optarg;
 			break;
@@ -68,6 +74,11 @@ main(int argc, char *argv[])
 		}
 	argc -= optind;
 	argv += optind;
+
+	/* バッファの確保 */
+	buf = malloc(buflen);
+	if (buf == NULL)
+		err(EXIT_FAILURE, "malloc");
 
 	/* シグナルハンドラの設定 */
 	sa.sa_handler = handler;
@@ -92,17 +103,6 @@ main(int argc, char *argv[])
 	it.it_interval.tv_sec = it.it_interval.tv_nsec = 0;
 	it.it_value.tv_sec = period / GIGA * 16 + psec;
 	it.it_value.tv_nsec = pnsec;
-
-	/* 待ち時間用の設定（1 bit は 32 周期） */
-	pnprev = pnsec = psec = 0;
-	for (i = 0; i < 32 * BUFLEN; i++) {
-		pnsec = (pnprev + period) % GIGA;
-		if (pnsec < pnprev)
-			psec++;
-		pnprev = pnsec;
-	}
-	tv.tv_sec = period / GIGA * 32 * BUFLEN + psec;
-	tv.tv_nsec = pnsec;
 
 	/* 送信機を開く */
 	dev = open(device, O_RDWR | O_NOCTTY);
@@ -143,7 +143,7 @@ main(int argc, char *argv[])
 
 			/* 送信機が何か言っているなら読み込む */
 			if (FD_ISSET(dev, &rfds)) {
-				bytes = read(dev, buf, sizeof(buf));
+				bytes = read(dev, buf, buflen);
 				if (bytes == -1)
 					err(EXIT_FAILURE, "%s", device);
 				/* 送信終了でなければ無視する */
@@ -159,7 +159,7 @@ main(int argc, char *argv[])
 			}
 
 			/* ファイルから読んで送信機に送る */
-			bytes = read(fd, buf, sizeof(buf));
+			bytes = read(fd, buf, buflen);
 			if (bytes <= 0)
 				break;
 			if (reqSpeed && dprintf(dev, "\r%s\r", speed) < 0)
@@ -169,6 +169,15 @@ main(int argc, char *argv[])
 			reqSpeed = 0;
 
 			/* 送信機のバッファが溢れないように少し待つ */
+			pnprev = pnsec = psec = 0;
+			for (j = 0; j < 32 * bytes; j++) {
+				pnsec = (pnprev + period) % GIGA;
+				if (pnsec < pnprev)
+					psec++;
+				pnprev = pnsec;
+			}
+			tv.tv_sec = period / GIGA * 32 * bytes + psec;
+			tv.tv_nsec = pnsec;
 			if (nanosleep(&tv, NULL) == -1)
 				err(EXIT_FAILURE, "nanosleep");
 		} while (bytes > 0);
@@ -186,6 +195,9 @@ main(int argc, char *argv[])
 
 	/* 送信機を閉じる */
 	(void)close(dev);
+
+	/* バッファを解放する */
+	free(buf);
 
 	return 0;
 }
