@@ -28,12 +28,35 @@ UBUNTU_CODENAME=noble
 LOGO=ubuntu-logo
 ```
 
+あるいは、
+
+```console
+% uname -a
+Darwin zumi.local.kusaremkn.com 24.6.0 Darwin Kernel Version 24.6.0: Mon Aug 11 21:16:05 PDT 2025; root:xnu-11417.140.69.701.11~1/RELEASE_X86_64 x86_64
+% sw_vers
+ProductName:		macOS
+ProductVersion:		15.7.1
+BuildVersion:		24G231
+% cc --version
+Apple clang version 17.0.0 (clang-1700.0.13.5)
+Target: x86_64-apple-darwin24.6.0
+Thread model: posix
+InstalledDir: /Library/Developer/CommandLineTools/usr/bin
+```
+
 ## コンパイル
 
 Unix-like なシステム上で動作する C のコンパイラが必要です。
 
 ```console
 $ make
+```
+
+ただし、macOS の上で利用するにはパッチを充てる必要があります。
+
+```console
+% patch <macOS.patch
+% make
 ```
 
 ## 使いかた
@@ -56,3 +79,8 @@ $ tdriver [-b buflen] [-d transmitter] [-s speed] [file ...]
     デフォルトでは **300** が指定されています。
 - *file*: 送信するファイルを指定します。
     **-** が指定されるか、何も指定されなかった場合、標準入力を用います。
+
+ただし、macOS の上で利用する場合は以下の点に注意してくだささい:
+
+- 送信機のデバイスファイルには、名前が cu で始まるものを指定します。
+    名前が tty で始まるものを指定した場合、プログラムは正常に動作しません。
