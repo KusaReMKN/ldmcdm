@@ -10,17 +10,17 @@
 
 ## ファイル一覧
 
-- driver
+- driver:
   Linux の上で動作する、復号ビット誤り率を測定するためのプログラムです。
 
-- receiver
+- receiver:
   受信機のプログラムです。
   PlatformIO が必要です。
 
-- tdriver
+- tdriver:
   Linux や macOS の上で動作する、送信機を簡便に制御するためのプログラムです。
 
-- transmitter
+- transmitter:
   送信機のプログラムです。
   PlatformIO が必要です。
 
